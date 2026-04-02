@@ -2,6 +2,7 @@ import { useState, useContext, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import OnboardingModal from './OnboardingModal';
+import PWAInstallPrompt from './PWAInstallPrompt';
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -206,6 +207,7 @@ export default function Layout() {
         <main className="flex-1 overflow-auto bg-slate-900 pb-20 md:pb-0 relative">
           <Outlet />
           <OnboardingModal />
+          <PWAInstallPrompt />
         </main>
 
         {/* Mobile Bottom Navigation */}
