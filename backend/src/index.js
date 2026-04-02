@@ -16,9 +16,13 @@ import customersRoutes from './routes/customers.js';
 import integrationsRoutes from './routes/integrations.js';
 import dashboardRoutes from './routes/dashboard.js';
 import agentSettingsRoutes from './routes/agentSettings.js';
+import subscriptionsRoutes from './routes/subscriptions.js';
+import stripeWebhooksRoutes from './routes/stripeWebhooks.js';
 import { startAbandonedCartWorker } from './workers/abandonedCartWorker.js';
 
 const app = express();
+
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhooksRoutes);
 
 app.use(cors());
 app.use(express.json());
@@ -30,6 +34,7 @@ app.use('/api/customers', customersRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/agent-settings', agentSettingsRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
 
 const PORT = process.env.BACKEND_PORT || 4005;
 

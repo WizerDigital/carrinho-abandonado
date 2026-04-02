@@ -12,12 +12,15 @@ import {
   Menu,
   ChevronLeft,
   Bot,
-  UserCircle
+  UserCircle,
+  CreditCard,
+  ChevronDown
 } from 'lucide-react';
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { logout, user } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,13 +37,36 @@ export default function Layout() {
     { name: 'Produtos', icon: Package, path: '/produtos' },
     { name: 'Integrações', icon: LinkIcon, path: '/integracoes' },
     { name: 'Agente', icon: Bot, path: '/agente' },
-    { name: 'Minha Conta', icon: UserCircle, path: '/minha-conta' },
   ];
+
+  const allPageTitles = {
+    '/': 'Dashboard',
+    '/vendas': 'Vendas',
+    '/clientes': 'Clientes',
+    '/produtos': 'Produtos',
+    '/integracoes': 'Integrações',
+    '/agente': 'Agente',
+    '/minha-conta': 'Minha Conta',
+    '/assinatura': 'Assinatura',
+  };
 
   // Close mobile menu when route changes
   useEffect(() => {
     setMobileMenuOpen(false);
+    setUserMenuOpen(false);
   }, [location.pathname]);
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuOpen && !event.target.closest('.user-dropdown')) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 overflow-hidden">
@@ -115,22 +141,64 @@ export default function Layout() {
               <Menu size={24} />
             </button>
             <h1 className="text-lg md:text-xl font-semibold truncate">
-              {menuItems.find(m => m.path === location.pathname)?.name || 'Dashboard'}
+              {allPageTitles[location.pathname] || 'Dashboard'}
             </h1>
           </div>
           
-          <div className="flex items-center gap-3 md:gap-4">
-            <span className="text-xs md:text-sm text-slate-400 hidden sm:block truncate max-w-[150px] md:max-w-[200px]">
-              {user?.email}
-            </span>
+          <div className="flex items-center gap-3 md:gap-4 relative user-dropdown">
             <button 
-              onClick={handleLogout}
-              className="flex items-center justify-center gap-2 p-2 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-              title="Sair"
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 p-1.5 md:p-2 hover:bg-slate-700 rounded-lg transition-colors group"
             >
-              <LogOut size={18} />
-              <span className="hidden sm:inline">Sair</span>
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                {user?.name ? user.name[0].toUpperCase() : (user?.email?.[0].toUpperCase() || 'U')}
+              </div>
+              <div className="hidden sm:flex flex-col items-start text-left">
+                <span className="text-sm font-medium text-slate-100 leading-tight truncate max-w-[150px]">
+                  {user?.name || user?.email?.split('@')[0]}
+                </span>
+                <span className="text-[11px] text-slate-400 leading-tight truncate max-w-[150px]">
+                  {user?.email}
+                </span>
+              </div>
+              <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
             </button>
+
+            {userMenuOpen && (
+               <div className="absolute top-full right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 z-[60]">
+                <div className="px-4 py-3 border-b border-slate-700 sm:hidden">
+                  <p className="text-sm font-medium text-white truncate">{user?.name || user?.email?.split('@')[0]}</p>
+                  <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                </div>
+                
+                <div className="py-1">
+                  <Link 
+                    to="/minha-conta"
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  >
+                    <UserCircle size={18} />
+                    Minha Conta
+                  </Link>
+                  <Link 
+                    to="/assinatura"
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  >
+                    <CreditCard size={18} />
+                    Assinatura
+                  </Link>
+                </div>
+                
+                <div className="border-t border-slate-700 mt-1 pt-1">
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                  >
+                    <LogOut size={18} />
+                    Sair da conta
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 

@@ -4,6 +4,7 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 
 import Layout from './components/Layout';
+import Assinatura from './pages/Assinatura';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="integracoes" element={<Integracoes />} />
         <Route path="agente" element={<Agente />} />
         <Route path="minha-conta" element={<MinhaConta />} />
+        <Route path="assinatura" element={<Assinatura />} />
       </Route>
     </Routes>
   );

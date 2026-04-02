@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import { Settings, MessageSquare, Plus, Trash2, HelpCircle, ShieldAlert, Phone, Smartphone, Eye, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Settings, MessageSquare, Plus, Trash2, HelpCircle, ShieldAlert, Phone, Smartphone, Eye, Clock, AlertTriangle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 export default function Agente() {
   const { addToast } = useToast();
+  const navigate = useNavigate();
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [settings, setSettings] = useState({
     agent_name: 'Assistente',
     followup_enabled: false,
@@ -82,10 +85,19 @@ export default function Agente() {
     }
   };
 
+  const fetchSubscription = async () => {
+    try {
+      const res = await api.get('/subscriptions/status');
+      setSubscriptionStatus(res.data);
+    } catch (err) {
+      console.error('Failed to fetch subscription status', err);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await Promise.all([fetchSettings(), fetchProducts(), fetchWahaStatus()]);
+      await Promise.all([fetchSettings(), fetchProducts(), fetchWahaStatus(), fetchSubscription()]);
       setLoading(false);
     };
     init();
@@ -108,6 +120,12 @@ export default function Agente() {
   };
 
   const handleStartSession = async () => {
+    if (subscriptionStatus?.plan === 'free' || subscriptionStatus?.isTrialing) {
+      addToast({ type: 'error', message: 'Você precisa de um plano pago para conectar o WhatsApp.' });
+      navigate('/assinatura');
+      return;
+    }
+
     try {
       await api.post('/agent-settings/waha/start');
       addToast({ type: 'success', message: 'Sessão iniciada com sucesso!' });
@@ -266,6 +284,24 @@ export default function Agente() {
           </div>
         </div>
       </div>
+
+      {(subscriptionStatus?.plan === 'free' || subscriptionStatus?.isTrialing) && (
+        <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4 mb-6 flex items-start gap-4">
+          <AlertTriangle className="text-yellow-500 w-6 h-6 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-yellow-400 font-bold text-lg mb-1">Conexão Bloqueada (Período de Teste)</h3>
+            <p className="text-yellow-200/80 mb-3 text-sm">
+              Durante o período de teste grátis, não é possível conectar o WhatsApp para iniciar o agente. Para liberar essa funcionalidade, assine um de nossos planos.
+            </p>
+            <button 
+              onClick={() => navigate('/assinatura')}
+              className="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+            >
+              Ver Planos de Assinatura
+            </button>
+          </div>
+        </div>
+      )}
 
       {wahaStatus === 'SCAN_QR_CODE' && qrCodeUrl && (
         <div className="mb-6 bg-slate-800 p-4 rounded-xl border border-yellow-500/30 flex flex-col items-center">

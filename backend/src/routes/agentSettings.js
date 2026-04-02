@@ -102,6 +102,14 @@ router.get('/prompt-preview/:contactId', requireAuth, async (req, res) => {
 // WAHA: Start Session
 router.post('/waha/start', requireAuth, async (req, res) => {
   try {
+    const tenantRes = await query('SELECT plan, subscription_status, trial_ends_at FROM tenants WHERE id = $1', [req.user.tenant_id]);
+    const tenant = tenantRes.rows[0];
+    const isTrialing = tenant.subscription_status === 'trialing' && new Date() < new Date(tenant.trial_ends_at);
+    
+    if (tenant.plan === 'free' || isTrialing) {
+      return res.status(403).json({ error: 'Você precisa de um plano pago para conectar o WhatsApp.' });
+    }
+
     const settings = await getOrCreateSettings(req.user.tenant_id);
     let sessionId = settings.waha_session_id;
     

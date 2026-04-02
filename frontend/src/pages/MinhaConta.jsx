@@ -1,5 +1,5 @@
 import { useState, useContext, useEffect } from 'react';
-import { User, Mail, Lock, Shield, CheckCircle } from 'lucide-react';
+import { User, Mail, Lock, Shield, CheckCircle, Smartphone } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import api from '../api';
@@ -9,17 +9,38 @@ export default function MinhaConta() {
   const { addToast } = useToast();
   
   const [formData, setFormData] = useState({
+    name: user?.name || '',
     email: user?.email || '',
+    whatsapp: user?.whatsapp || '',
     password: '',
     confirmPassword: ''
   });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (user?.email) {
-      setFormData(prev => ({ ...prev, email: user.email }));
+    if (user) {
+      setFormData(prev => ({ 
+        ...prev, 
+        name: user.name || '',
+        email: user.email || '',
+        whatsapp: user.whatsapp || ''
+      }));
     }
   }, [user]);
+
+  const handleWhatsappChange = (e) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+    if (v.length > 2) {
+      v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
+    }
+    if (v.length > 9) {
+      v = v.replace(/(\d{4})(\d{4})$/, '$1-$2');
+    } else if (v.length > 8) {
+      v = v.replace(/(\d{4})(\d{0,4})$/, '$1-$2');
+    }
+    setFormData(prev => ({ ...prev, whatsapp: v }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,13 +51,21 @@ export default function MinhaConta() {
 
     setSaving(true);
     try {
-      const payload = { email: formData.email };
+      const payload = { 
+        name: formData.name,
+        email: formData.email,
+        whatsapp: formData.whatsapp
+      };
       if (formData.password) {
         payload.password = formData.password;
       }
       
-      await api.put('/auth/me', payload);
-      updateUser({ email: formData.email });
+      const res = await api.put('/auth/me', payload);
+      updateUser({ 
+        name: res.data.name,
+        email: res.data.email,
+        whatsapp: res.data.whatsapp
+      });
       
       addToast({ type: 'success', message: 'Dados atualizados com sucesso!' });
       
@@ -72,6 +101,20 @@ export default function MinhaConta() {
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+              <User size={16} className="text-slate-400" /> Nome / Empresa
+            </label>
+            <input
+              type="text"
+              required
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              placeholder="Seu nome"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
               <Mail size={16} className="text-slate-400" /> E-mail
             </label>
             <input
@@ -81,6 +124,21 @@ export default function MinhaConta() {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               placeholder="seu@email.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+              <Smartphone size={16} className="text-slate-400" /> WhatsApp
+            </label>
+            <input
+              type="text"
+              required
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              value={formData.whatsapp}
+              onChange={handleWhatsappChange}
+              placeholder="(11) 99999-9999"
+              maxLength={15}
             />
           </div>
 

@@ -59,7 +59,7 @@ export default function Produtos() {
 
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl md:text-2xl font-bold">Produtos</h2>
         <div className="flex w-full sm:w-auto gap-2">
           <button 
