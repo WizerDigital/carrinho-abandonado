@@ -34,6 +34,18 @@ export async function startTyping(session, chatId) {
   }
 }
 
+export async function checkWhatsappExists(session, phone) {
+  try {
+    const response = await wahaApi.get('/api/contacts/check-exists', {
+      params: { session, phone }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error checking whatsapp exists:', error?.response?.data || error.message);
+    return null;
+  }
+}
+
 export async function stopTyping(session, chatId) {
   try {
     await wahaApi.post('/api/stopTyping', {

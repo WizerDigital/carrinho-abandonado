@@ -3,6 +3,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
+  onboarding_completed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -17,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS customers (
+CREATE TABLE IF NOT EXISTS clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
@@ -25,8 +26,12 @@ CREATE TABLE IF NOT EXISTS customers (
   phone VARCHAR(20),
   document VARCHAR(50),
   type VARCHAR(50) DEFAULT 'lead' CHECK (type IN ('lead', 'cliente')),
+  whatsapp_id TEXT,
+  jid TEXT,
+  lid TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, phone)
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -44,12 +49,13 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS sales (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
   product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   amount DECIMAL(10, 2) NOT NULL,
   status VARCHAR(50) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovada', 'cancelada', 'carrinho abandonado', 'reembolsada', 'chargeback', 'expirada', 'atrasada', 'disputa', 'completa')),
   transaction_id VARCHAR(255),
   platform VARCHAR(50),
+  recovered_cart BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -62,6 +68,25 @@ CREATE TABLE IF NOT EXISTS integration_webhooks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS agent_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE UNIQUE,
+  waha_session_id VARCHAR(255),
+  waha_status VARCHAR(50) DEFAULT 'disconnected',
+  agent_name VARCHAR(255) DEFAULT 'Assistente',
+  followup_enabled BOOLEAN DEFAULT FALSE,
+  followup_delay_minutes INTEGER DEFAULT 60,
+  followup_message TEXT,
+  personality TEXT,
+  communication_tone VARCHAR(50) DEFAULT 'formal',
+  active_products JSONB DEFAULT '[]',
+  faq_items JSONB DEFAULT '[]',
+  objection_handlers JSONB DEFAULT '[]',
+  system_prompt_template TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Seed Initial Data
 INSERT INTO tenants (id, name) VALUES ('11111111-1111-1111-1111-111111111111', 'Wizer Digital') ON CONFLICT DO NOTHING;
 -- We will hash the password in Node.js, but for seed we can insert a dummy hash and run an init script, or generate hash with pgcrypto.
@@ -72,17 +97,6 @@ VALUES (
   'suporte@wizer.digital', 
   crypt('Foco@ia8992!', gen_salt('bf', 10))
 ) ON CONFLICT (email) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS clients (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phone VARCHAR(20) UNIQUE NOT NULL,
-  whatsapp_id TEXT,
-  jid TEXT,
-  lid TEXT,
-  name VARCHAR(255),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
 CREATE TABLE IF NOT EXISTS webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

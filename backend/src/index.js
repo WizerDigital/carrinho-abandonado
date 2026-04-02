@@ -15,6 +15,7 @@ import salesRoutes from './routes/sales.js';
 import customersRoutes from './routes/customers.js';
 import integrationsRoutes from './routes/integrations.js';
 import dashboardRoutes from './routes/dashboard.js';
+import agentSettingsRoutes from './routes/agentSettings.js';
 import { startAbandonedCartWorker } from './workers/abandonedCartWorker.js';
 
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/agent-settings', agentSettingsRoutes);
 
 const PORT = process.env.BACKEND_PORT || 4005;
 

@@ -4,15 +4,14 @@ export const agentTools = [
   {
     type: 'function',
     function: {
-      name: 'get_available_slots',
-      description: 'Verifica os horários disponíveis para agendamento em uma data específica.',
+      name: 'search_products',
+      description: 'Busca informaÃ§Ãµes sobre outros produtos oferecidos pela loja/tenant.',
       parameters: {
         type: 'object',
         properties: {
-          date: { type: 'string', description: 'A data desejada no formato YYYY-MM-DD' },
-          professional_id: { type: 'string', description: 'ID do profissional (opcional)' }
+          search_term: { type: 'string', description: 'Termo de busca para encontrar o produto pelo nome ou descriÃ§Ã£o' }
         },
-        required: ['date']
+        required: ['search_term']
       }
     }
   },
@@ -24,7 +23,7 @@ export const agentTools = [
       parameters: {
         type: 'object',
         properties: {
-          motivo: { type: 'string', description: 'Motivo pelo qual o usuário quer falar com humano.' }
+          motivo: { type: 'string', description: 'Motivo pelo qual o usuï¿½rio quer falar com humano.' }
         },
         required: ['motivo']
       }
@@ -36,9 +35,13 @@ export async function executeTool(toolName, argsArgs, tenantId, contactId) {
   try {
     const args = JSON.parse(argsArgs);
     
-    if (toolName === 'get_available_slots') {
-      console.log(`Buscando slots para a data: ${args.date}`);
-      return JSON.stringify({ available_slots: ["09:00", "10:30", "14:00", "16:00"] });
+    if (toolName === 'search_products') {
+      console.log(`Buscando produtos pelo termo: ${args.search_term}`);
+      const searchRes = await query(
+        `SELECT name, description, price FROM products WHERE tenant_id = $1 AND (name ILIKE $2 OR description ILIKE $2) LIMIT 5`,
+        [tenantId, `%${args.search_term}%`]
+      );
+      return JSON.stringify({ products: searchRes.rows });
     }
 
     if (toolName === 'encaminhar_atendimento_humano') {
@@ -51,7 +54,7 @@ export async function executeTool(toolName, argsArgs, tenantId, contactId) {
       return JSON.stringify({ status: "sucesso", mensagem: "Atendimento humano solicitado e bot pausado." });
     }
 
-    return JSON.stringify({ error: "Ferramenta não encontrada." });
+    return JSON.stringify({ error: "Ferramenta nï¿½o encontrada." });
   } catch (error) {
     console.error(`Error executing tool ${toolName}:`, error);
     return JSON.stringify({ error: "Erro ao executar ferramenta." });

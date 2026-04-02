@@ -25,9 +25,9 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-slate-800 rounded-xl shadow-xl p-8 border border-slate-700">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">Crie sua conta</h2>
+      <div className="max-w-md w-full bg-slate-800 rounded-xl shadow-xl p-6 md:p-8 border border-slate-700">
+        <div className="text-center mb-6 md:mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Crie sua conta</h2>
           <p className="text-slate-400">Comece a gerenciar seu negócio agora</p>
         </div>
 

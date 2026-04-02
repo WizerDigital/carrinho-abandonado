@@ -1,4 +1,7 @@
 import { query } from '../config/db.js';
+import { sanitizePhoneForWaha, cleanPhone } from '../../../src/utils/phone.js';
+import { checkWhatsappExists } from '../../../src/api/waha.js';
+import { recoveryQueue } from '../../../src/config/queues.js';
 
 export async function processWebhook(tenant_id, platform, payload) {
   try {
@@ -159,25 +162,49 @@ async function handleHotmart(tenant_id, payload) {
 }
 
 async function upsertPlatformData(tenant_id, platform, { email, name, phone, document, productId, productName, price, transactionId, status }) {
-  // 1. Upsert Customer
-  let customerRes = await query(
-    `SELECT id FROM customers WHERE tenant_id = $1 AND email = $2 LIMIT 1`,
-    [tenant_id, email]
-  );
-  let customerId;
+  let finalPhone = phone;
+  let whatsappId = null;
 
-  if (customerRes.rows.length > 0) {
-    customerId = customerRes.rows[0].id;
+  if (phone) {
+    const sanitized = sanitizePhoneForWaha(phone);
+    if (sanitized) {
+      let wahaSession = process.env.WAHA_SESSION || 'default';
+      const settingsRes = await query('SELECT waha_session_id FROM agent_settings WHERE tenant_id = $1', [tenant_id]);
+      if (settingsRes.rows.length > 0 && settingsRes.rows[0].waha_session_id) {
+        wahaSession = settingsRes.rows[0].waha_session_id;
+      }
+
+      const wahaRes = await checkWhatsappExists(wahaSession, sanitized);
+      if (wahaRes && wahaRes.numberExists) {
+        whatsappId = wahaRes.chatId;
+        finalPhone = whatsappId.replace('@c.us', '').replace('@s.whatsapp.net', '');
+      } else {
+        finalPhone = cleanPhone(phone);
+      }
+    } else {
+      finalPhone = cleanPhone(phone);
+    }
+  }
+
+  // 1. Upsert Client
+  let clientRes = await query(
+    `SELECT id FROM clients WHERE tenant_id = $1 AND (email = $2 OR phone = $3) LIMIT 1`,
+    [tenant_id, email, finalPhone]
+  );
+  let clientId;
+
+  if (clientRes.rows.length > 0) {
+    clientId = clientRes.rows[0].id;
     await query(
-      `UPDATE customers SET name = $1, phone = $2, document = $3, updated_at = NOW() WHERE id = $4`,
-      [name, phone, document, customerId]
+      `UPDATE clients SET name = $1, phone = $2, document = $3, whatsapp_id = COALESCE($4, whatsapp_id), jid = COALESCE($5, jid), updated_at = NOW() WHERE id = $6`,
+      [name, finalPhone, document, whatsappId, whatsappId, clientId]
     );
   } else {
-    customerRes = await query(
-      `INSERT INTO customers (tenant_id, name, email, phone, document, type) VALUES ($1, $2, $3, $4, $5, 'lead') RETURNING id`,
-      [tenant_id, name, email, phone, document]
+    clientRes = await query(
+      `INSERT INTO clients (tenant_id, name, email, phone, document, whatsapp_id, jid, type) VALUES ($1, $2, $3, $4, $5, $6, $7, 'lead') RETURNING id`,
+      [tenant_id, name, email, finalPhone, document, whatsappId, whatsappId]
     );
-    customerId = customerRes.rows[0].id;
+    clientId = clientRes.rows[0].id;
   }
 
   // 2. Upsert Product
@@ -214,28 +241,61 @@ async function upsertPlatformData(tenant_id, platform, { email, name, phone, doc
     [tenant_id, platform, transactionId]
   );
 
+  let isRecovery = false;
+
+  if (status === 'aprovada' && finalPhone) {
+    const abandonedRes = await query(`
+      SELECT s.id 
+      FROM sales s
+      JOIN clients c ON s.client_id = c.id
+      WHERE s.tenant_id = $1 AND c.phone = $2 AND s.status = 'carrinho abandonado' AND s.recovered_cart = FALSE
+      LIMIT 1
+    `, [tenant_id, finalPhone]);
+
+    if (abandonedRes.rows.length > 0) {
+      isRecovery = true;
+      await query(`UPDATE sales SET recovered_cart = TRUE, updated_at = NOW() WHERE id = $1`, [abandonedRes.rows[0].id]);
+    }
+  }
+
   if (saleRes.rows.length > 0) {
     const saleId = saleRes.rows[0].id;
     if (price > 0) {
       await query(
-        `UPDATE sales SET status = $1, amount = $2, updated_at = NOW() WHERE id = $3`,
-        [status, price, saleId]
+        `UPDATE sales SET status = $1, amount = $2, recovered_cart = $3, updated_at = NOW() WHERE id = $4`,
+        [status, price, isRecovery, saleId]
       );
     } else {
       await query(
-        `UPDATE sales SET status = $1, updated_at = NOW() WHERE id = $2`,
-        [status, saleId]
+        `UPDATE sales SET status = $1, recovered_cart = $2, updated_at = NOW() WHERE id = $3`,
+        [status, isRecovery, saleId]
       );
     }
   } else {
     await query(
-      `INSERT INTO sales (tenant_id, customer_id, product_id, amount, status, transaction_id, platform) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [tenant_id, customerId, dbProductId, price, status, transactionId, platform]
+      `INSERT INTO sales (tenant_id, client_id, product_id, amount, status, transaction_id, platform, recovered_cart) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [tenant_id, clientId, dbProductId, price, status, transactionId, platform, isRecovery]
     );
   }
   
   if (status === 'aprovada') {
-    await query(`UPDATE customers SET type = 'cliente' WHERE id = $1`, [customerId]);
+    await query(`UPDATE clients SET type = 'cliente' WHERE id = $1`, [clientId]);
+  }
+
+  if (status === 'carrinho abandonado' && whatsappId) {
+    const jobId = `recovery_${tenant_id}_${transactionId}`;
+    await recoveryQueue.add(
+      'process_recovery',
+      {
+        tenantId: tenant_id,
+        contactId: whatsappId,
+        customerName: name,
+        productName: productName,
+        transactionId: transactionId
+      },
+      { jobId, delay: 2 * 60 * 1000, removeOnComplete: true, removeOnFail: false }
+    );
+    console.log(`[INFO] Agendada recuperação de carrinho para ${whatsappId} em 2 minutos.`);
   }
 }
